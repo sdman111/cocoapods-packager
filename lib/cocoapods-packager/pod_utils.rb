@@ -5,7 +5,7 @@ module Pod
 
       def build_static_sandbox(dynamic)
         static_sandbox_root = if dynamic
-                                Pathname.new(config.sandbox_root + '/Static')
+                                Pathname.new(config.sandbox_root + '/Static') # 根据参数 dynamic 来判断，是否需要创建二级目录 /static
                               else
                                 Pathname.new(config.sandbox_root)
                               end
@@ -13,6 +13,7 @@ module Pod
       end
 
       def install_pod(platform_name, sandbox)
+        # 得到Podfile
         podfile = podfile_from_spec(
           @path,
           @spec.name,
@@ -23,7 +24,7 @@ module Pod
         )
 
         static_installer = Installer.new(sandbox, podfile)
-        static_installer.install!
+        static_installer.install! # pod install
 
         unless static_installer.nil?
           static_installer.pods_project.targets.each do |target|
@@ -38,6 +39,7 @@ module Pod
         static_installer
       end
 
+      # 根据指定的 spec 来手动创建 podfile
       def podfile_from_spec(path, spec_name, platform_name, deployment_target, subspecs, sources)
         options = {}
         if path
@@ -48,6 +50,7 @@ module Pod
           end
         end
         options[:subspecs] = subspecs if subspecs
+        # 写Podfile
         Pod::Podfile.new do
           sources.each { |s| source s }
           platform(platform_name, deployment_target)
@@ -133,13 +136,13 @@ module Pod
         project = prepare_pods_project(dynamic_sandbox, dynamic_target.name, static_installer)
 
         # 3. Copy the source directory for the dynamic framework from the static sandbox.
-        copy_dynamic_target(static_sandbox, dynamic_target, dynamic_sandbox)
+        copy_dynamic_target(static_sandbox, dynamic_target, dynamic_sandbox) # 从 static sandbox 中 cp 到 dynamic sandbox
 
         # 4. Create the file references.
-        install_file_references(dynamic_sandbox, [dynamic_target], project)
+        install_file_references(dynamic_sandbox, [dynamic_target], project) # 为 dynamic target 生成文件引用
 
         # 5. Install the target.
-        install_library(dynamic_sandbox, dynamic_target, project)
+        install_library(dynamic_sandbox, dynamic_target, project) # 将 dynamic_target 写入新建的 project，同时会 install 依赖的 system framework
 
         # 6. Write the actual .xcodeproj to the dynamic sandbox.
         write_pod_project(project, dynamic_sandbox)
@@ -150,6 +153,7 @@ module Pod
       # @return [Pod::PodTarget]
       #
       def build_dynamic_target(dynamic_sandbox, static_installer, platform)
+        # 通过 select static_installer.pod_targets 筛选出 static_target
         spec_targets = static_installer.pod_targets.select do |target|
           target.name == @spec.name
         end
@@ -158,6 +162,7 @@ module Pod
         file_accessors = create_file_accessors(static_target, dynamic_sandbox)
 
         archs = []
+        # 创建PodTarget
         dynamic_target = Pod::PodTarget.new(dynamic_sandbox, true, static_target.user_build_configurations, archs, platform, static_target.specs, static_target.target_definitions, file_accessors)
         dynamic_target
       end
@@ -171,7 +176,7 @@ module Pod
       def prepare_pods_project(dynamic_sandbox, spec_name, installer)
         # Create a new pods project
         pods_project = Pod::Project.new(dynamic_sandbox.project_path)
-
+        # 创建 Pod::Project，然后将 static project 中的 user configuration 复制过来
         # Update build configurations
         installer.analysis_result.all_user_build_configurations.each do |name, type|
           pods_project.add_build_configuration(name, type)
@@ -223,6 +228,7 @@ module Pod
         end
       end
 
+      # 将 project 写入 dynamic sandbox，修改 Search Path 保证能查询到依赖的 header 引用
       def write_pod_project(dynamic_project, dynamic_sandbox)
         UI.message "- Writing Xcode project file to #{UI.path dynamic_sandbox.project_path}" do
           dynamic_project.pods.remove_from_project if dynamic_project.pods.empty?

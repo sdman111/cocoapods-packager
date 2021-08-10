@@ -52,7 +52,7 @@ module Pod
 
         @config = argv.option('configuration', 'Release')
 
-        @source_dir = Dir.pwd
+        @source_dir = Dir.pwd # 执行命令时所在目录
         @is_spec_from_path = false
         @spec = spec_with_path(@name)
         @is_spec_from_path = true if @spec
@@ -60,6 +60,7 @@ module Pod
         super
       end
 
+      # 校验所传参数有效性，如果参数中带有 --help 选项，则会直接抛出帮助提示, 在 run 方法执行前被调用
       def validate!
         super
         help! 'A podspec name or path is required.' unless @spec
@@ -69,28 +70,36 @@ module Pod
         help! '--local option can only be used when a local `.podspec` path is given.' if @local && !@is_spec_from_path
       end
 
+      # 入口, 检查是否取到所要编译的 podspec 文件。然后针对它创建对应的 working_directory 和 target_directory
       def run
+        # 检查是否取到所要编译的 podspec 文件
         if @spec.nil?
           help! "Unable to find a podspec with path or name `#{@name}`."
           return
         end
 
+        # working_directory 为打包所在的临时目录
+        # target_directory 为最终生成 package 的所在目录
         target_dir, work_dir = create_working_directory
         return if target_dir.nil?
+
         build_package
 
+        # 编译产物 copy 到 target_directory
         `mv "#{work_dir}" "#{target_dir}"`
+        # 切换回最初执行命令所在目录
         Dir.chdir(@source_dir)
       end
 
       private
 
+      # iOS / Mac / Watch
       def build_in_sandbox(platform)
-        config.installation_root  = Pathname.new(Dir.pwd)
-        config.sandbox_root       = 'Pods'
+        config.installation_root  = Pathname.new(Dir.pwd) # config 的安装目录 working_dirctory
+        config.sandbox_root       = 'Pods' # 沙盒目录 ./Pods
 
-        static_sandbox = build_static_sandbox(@dynamic)
-        static_installer = install_pod(platform.name, static_sandbox)
+        static_sandbox = build_static_sandbox(@dynamic) # 创建沙盒 -> pod_utils.rb
+        static_installer = install_pod(platform.name, static_sandbox) # pod install -> pod_utils.rb
 
         if @dynamic
           dynamic_sandbox = build_dynamic_sandbox(static_sandbox, static_installer)
@@ -106,15 +115,20 @@ module Pod
       end
 
       def build_package
+        # SpecBuilder用于生成描述最终产物的 podspec 文件, SpecBuilder 就是一个模版文件生成器
         builder = SpecBuilder.new(@spec, @source, @embedded, @dynamic)
+        # bundler 调用 spec_metadata 方法遍历指定的 podspec 文件复刻出对应的配置并返回新生成的 podspec 文件
         newspec = builder.spec_metadata
 
         @spec.available_platforms.each do |platform|
-          build_in_sandbox(platform)
-
+          build_in_sandbox(platform) # iOS / Mac / Watch 依次执行 build_in_sandbox
+          # 同时将 platform 信息写入 newspec
+          # s.ios.deployment_target    = '8.0'
+          # s.ios.vendored_framework   = 'ios/A.embeddedframework/A.framework'
           newspec += builder.spec_platform(platform)
         end
 
+        # 将 podspec 写入 target_directory 编译结束
         newspec += builder.spec_close
         File.open(@spec.name + '.podspec', 'w') { |file| file.write(newspec) }
       end

@@ -30,7 +30,7 @@ module Pod
       end
     end
 
-    # 打包入口
+    # 二进制打包入口
     def build_static_library
       UI.puts("Building static library #{@spec} with configuration #{@config}")
 
@@ -144,12 +144,13 @@ module Pod
 
     def build_static_library_for_ios(output)
       static_libs = static_libs_in_sandbox('build') + static_libs_in_sandbox('build-sim') + vendored_libraries
+      # 生成各个架构的二进制包
       libs = ios_architectures.map do |arch|
         library = "#{@static_sandbox_root}/build/package-#{arch}.a"
         `libtool -arch_only #{arch} -static -o #{library} #{static_libs.join(' ')}`
         library
       end
-
+      # 合并二进制包
       `lipo -create -output #{output} #{libs.join(' ')}`
     end
 
