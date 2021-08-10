@@ -316,6 +316,11 @@ MAP
         args = "#{args} CODE_SIGN_IDENTITY=\"\" CODE_SIGNING_REQUIRED=NO"
       end
 
+      # fixed: iphonesimulator and iphoneos have the same architectures (arm64) and can't be in the same fat output file
+      if build_dir == 'build-sim'
+        build_dir = build_dir + " EXCLUDED_ARCHS=\"arm64\""
+      end
+
       command = "xcodebuild #{defines} #{args} CONFIGURATION_BUILD_DIR=#{build_dir} clean build -configuration #{config} -target #{target} -project #{project_root}/Pods.xcodeproj 2>&1"
       output = `#{command}`.lines.to_a
 
