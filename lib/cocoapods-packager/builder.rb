@@ -1,4 +1,5 @@
 module Pod
+  # 负责打包各种包的类
   class Builder
     def initialize(platform, static_installer, source_dir, static_sandbox_root, dynamic_sandbox_root, public_headers_root, spec, embedded, mangle, dynamic, config, bundle_identifier, exclude_deps)
       @platform = platform
@@ -21,7 +22,7 @@ module Pod
     def build(package_type)
       case package_type
       when :static_library
-        build_static_library
+        build_static_library # 打包入口
       when :static_framework
         build_static_framework
       when :dynamic_framework
@@ -29,6 +30,7 @@ module Pod
       end
     end
 
+    # 打包入口
     def build_static_library
       UI.puts("Building static library #{@spec} with configuration #{@config}")
 
